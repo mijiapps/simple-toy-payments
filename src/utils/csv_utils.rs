@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsString;
@@ -23,23 +24,25 @@ pub fn parse_csv_data(reader: &mut Reader<File>) -> Result<Box<HashMap<u16, Acco
         let transaction: Transaction = result?;
         let client_id = transaction.client.clone();
 
-        if !accounts_map.contains_key(&transaction.client) {
-            let mut account = Account {
-                client: client_id.clone(),
-                available: Default::default(),
-                held: Default::default(),
-                total: Default::default(),
-                locked: false,
-                transactions: Default::default(),
-                disputed_transactions: Default::default(),
-                resolved_transactions: Default::default(),
-                chargeback_transactions: Default::default()
-            };
-            account.process_transaction(transaction);
-            accounts_map.insert(client_id, account);
-        } else {
-            let account = accounts_map.get_mut(&transaction.client).unwrap();
-            account.process_transaction(transaction);
+        match accounts_map.entry(client_id) {
+            Entry::Vacant(entry) => {
+                let mut account = Account {
+                    client: client_id.clone(),
+                    available: Default::default(),
+                    held: Default::default(),
+                    total: Default::default(),
+                    locked: false,
+                    transactions: Default::default(),
+                    disputed_transactions: Default::default(),
+                    resolved_transactions: Default::default(),
+                    chargeback_transactions: Default::default(),
+                };
+                account.process_transaction(transaction);
+                entry.insert(account);
+            }
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().process_transaction(transaction);
+            }
         }
     }
     Ok(Box::new(accounts_map))
