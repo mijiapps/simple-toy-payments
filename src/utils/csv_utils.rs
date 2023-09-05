@@ -22,12 +22,11 @@ pub fn parse_csv_data(reader: &mut Reader<File>) -> Result<Box<HashMap<u16, Acco
 
     for result in reader.deserialize() {
         let transaction: Transaction = result?;
-        let client_id = transaction.client.clone();
 
-        match accounts_map.entry(client_id) {
+        match accounts_map.entry(transaction.client.clone()) {
             Entry::Vacant(entry) => {
                 let mut account = Account {
-                    client: client_id.clone(),
+                    client: entry.key().clone(),
                     available: Default::default(),
                     held: Default::default(),
                     total: Default::default(),
