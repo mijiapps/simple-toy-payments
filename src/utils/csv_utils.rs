@@ -5,6 +5,7 @@ use std::ffi::OsString;
 use std::fs::File;
 use std::io;
 use csv::Reader;
+use debug_print::debug_println;
 use crate::data::account::Account;
 use crate::data::transaction::Transaction;
 
@@ -21,7 +22,13 @@ pub fn parse_csv_data(reader: &mut Reader<File>) -> Result<Box<HashMap<u16, Acco
     let mut accounts_map: HashMap<u16, Account> = HashMap::new();
 
     for result in reader.deserialize() {
-        let transaction: Transaction = result?;
+        let transaction: Transaction = match result {
+            Ok(transaction) => transaction,
+            Err(err) => {
+                debug_println!("Error parsing transaction: {}", err);
+                continue;
+            }
+        };
 
         match accounts_map.entry(transaction.client.clone()) {
             Entry::Vacant(entry) => {
@@ -57,8 +64,8 @@ pub fn write_csv_data(accounts: HashMap<u16, Account>) -> Result<(), Box<dyn Err
 }
 
 #[cfg(test)]
-pub fn get_test_data() -> Box<HashMap<u16, Account>> {
-    let mut reader = create_reader("test_data/transactions_comma.csv".into()).expect("Could not open file");
+pub fn get_test_data(csv_file: &str) -> Box<HashMap<u16, Account>> {
+    let mut reader = create_reader(csv_file.into()).expect("Could not open file");
     return parse_csv_data(&mut reader).unwrap();
 }
 
@@ -68,15 +75,21 @@ mod tests {
 
     #[test]
     fn test_parse_csv_data_not_empty() {
-        let test_accounts_map = get_test_data();
+        let test_accounts_map = get_test_data("test_data/transactions_comma.csv");
         assert_ne!(test_accounts_map.len(), 0);
     }
 
     #[test]
     fn test_parse_csv_data_contents() {
-        let test_accounts_map = get_test_data();
+        let test_accounts_map = get_test_data("test_data/transactions_comma.csv");
         assert_eq!(test_accounts_map.get(&1).unwrap().transactions.len(), 4);
         assert_eq!(test_accounts_map.get(&2).unwrap().transactions.len(), 2);
         assert_eq!(test_accounts_map.get(&2).unwrap().disputed_transactions.len(), 1);
+    }
+
+    #[test]
+    fn test_skip_row_when_error_in_csv() {
+        let test_accounts_map = get_test_data("test_data/transactions_errors.csv");
+        assert_ne!(test_accounts_map.len(), 0);
     }
 }
